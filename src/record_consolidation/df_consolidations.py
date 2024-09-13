@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-import networkx as nx  # type: ignore
+import networkx as nx
 import polars as pl
 
 from record_consolidation.graphs import (
