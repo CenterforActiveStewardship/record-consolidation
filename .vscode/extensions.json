@@ -1,0 +1,10 @@
+{
+    "recommendations": [
+        "ms-python.python",
+        "eamodio.gitlens",
+        "EditorConfig.EditorConfig",
+        "ms-python.isort",
+        "redhat.vscode-yaml",
+        "charliermarsh.ruff",
+    ]
+}

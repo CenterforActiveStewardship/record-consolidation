@@ -1,0 +1,29 @@
+default_stages: [commit]
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+      - id: black
+        name: black
+        entry: black --check .
+        language: system
+        pass_filenames: false
+      - id: mypy
+        name: mypy
+        entry: mypy --explicit-package-bases .
+        language: system
+        pass_filenames: false
+      - id: isort
+        name: isort
+        entry: isort --check .
+        language: system
+        pass_filenames: false
+      # - id: pytest  # UNCOMMENT ONCE TESTS ARE DEVELOPED
+      #   name: pytest
+      #   entry: pytest -s
+      #   language: system
+      #   pass_filenames: false
