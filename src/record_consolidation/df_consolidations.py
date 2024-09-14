@@ -4,9 +4,11 @@ import networkx as nx
 import polars as pl
 
 from record_consolidation.graphs import (
+    _extract_canonicals_from_subgraph,
     extract_consolidation_mapping_from_graph,
     unconsolidated_df_to_graph,
 )
+from record_consolidation.utils import extract_connected_subgraphs
 
 
 def consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
@@ -144,3 +146,24 @@ def consolidate_normalized_table(
             return consolidated_intra_field.pipe(_consolidate_inter_field).unique()
         case _:
             raise ValueError(depth)
+
+
+def extract_normalized_atomic(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Extracts a normalized atomic DataFrame from the input DataFrame.
+
+    This function converts the input DataFrame into a graph, processes its connected subgraphs to extract
+    canonical values for each field, and then constructs a new DataFrame from these canonical values.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame containing entity attributes.
+
+    Returns:
+        pl.DataFrame: A new DataFrame where each row represents a set of canonical values for the fields
+                      present in the input DataFrame.
+    """
+    g: nx.Graph = unconsolidated_df_to_graph(df)
+    df_precursor: list[dict[str, Any]] = []
+    for subg in extract_connected_subgraphs(g):
+        df_precursor.append(_extract_canonicals_from_subgraph(subg, "max_n"))
+    return pl.DataFrame(df_precursor)

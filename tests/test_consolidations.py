@@ -4,7 +4,10 @@ import polars as pl
 import pytest
 from regression_tester import RegressionTestPackage
 
-from record_consolidation.df_consolidations import consolidate_normalized_table
+from record_consolidation.df_consolidations import (
+    consolidate_normalized_table,
+    extract_normalized_atomic,
+)
 
 
 @pytest.fixture()
@@ -19,18 +22,6 @@ def MSFTS() -> pl.DataFrame:
     )
 
 
-# def test_intra_consolidation(MSFTS) -> None:
-#     reg_tester = RegressionTestPackage(
-#         root_path=Path("test_data/intra_field/"),
-#         extraction_fnc=lambda path: consolidate_normalized_table(
-#             MSFTS, depth="intra_field"
-#         )
-#         .unique()
-#         .sort(pl.all()),
-#     )
-#     reg_tester.execute_regression_test()
-
-
 @pytest.mark.parametrize(
     "depth",
     [
@@ -39,7 +30,6 @@ def MSFTS() -> pl.DataFrame:
     ],
 )
 def test_consolidation(MSFTS, depth) -> None:
-
     root_path = Path("test_data") / depth
     raw_input_path = root_path / "msfts_and_amzns.parquet"
     reg_tester = RegressionTestPackage(
@@ -47,6 +37,22 @@ def test_consolidation(MSFTS, depth) -> None:
         extraction_fnc=lambda _: consolidate_normalized_table(MSFTS, depth=depth)
         .unique()
         .sort(pl.all()),
-        optional_raw_input_path=raw_input_path,  # have to put an existing path here
+        optional_raw_input_path=raw_input_path,  # have to put an extant path here
+    )
+    reg_tester.execute_regression_test()
+
+
+def test_consolidation_via_normalized_atomizer(MSFTS) -> None:
+    """
+    Should produce the desired output of `consolidate_normalized_table(df, depth="intra_and_inter_field")`!
+    """
+    root_path = Path("test_data") / "intra_and_inter_field"
+    raw_input_path = root_path / "msfts_and_amzns.parquet"
+    reg_tester = RegressionTestPackage(
+        root_path=root_path,
+        extraction_fnc=lambda x: extract_normalized_atomic(MSFTS)
+        .unique()
+        .sort(pl.all()),
+        optional_raw_input_path=raw_input_path,  # have to put an extant path here
     )
     reg_tester.execute_regression_test()
