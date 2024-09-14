@@ -27,44 +27,30 @@ def unconsolidated_df_to_graph(
         nx.Graph: A NetworkX graph where nodes represent unique attribute values and edges represent
                   co-occurrences of these values within the same row of the DataFrame.
     """
-    # TODO: fix counts (adding extra to the counts -- although not consistently...)
     df = df.select(pl.all().replace(["", "N/A"], None))
     G: nx.Graph = nx.Graph()
     for row in df.rows(named=True):
         row = {k: v for k, v in row.items() if v is not None}
-        # Create all pairwise combinations of field-value pairs
-        for (field1, value1), (field2, value2) in combinations(row.items(), r=2):
-            # combinations(row.items(), r=2) appears as follows:
-            #   # [(('issuer_name', 'MICROSOFT CORPORATION'), ('cusip', None)),
-            #   #  (('issuer_name', 'MICROSOFT CORPORATION'), ('isin', 'US5949181045')),
-            #   #  (('issuer_name', 'MICROSOFT CORPORATION'), ('figi', None)),
-            #   #  (('cusip', None), ('isin', 'US5949181045')),
-            #   #  (('cusip', None), ('figi', None)),
-            #   #  (('isin', 'US5949181045'), ('figi', None))]
+        seen_values = set()  # Track values seen in this row
 
-            for value, field in [
-                (value1, field1),
-                (value2, field2),
-            ]:  # TODO: refactor/DRY/improve
+        # Increment node counts for each unique value in the row
+        for field, value in row.items():
+            if value not in seen_values:
                 if value not in G.nodes:
                     G.add_node(value, field=field, count=1)
                 else:
-                    # Get current count, default to 0 if the node doesn't exist
-                    prev_count: int = G.nodes[value]["count"]
-                    # Add or update node with incremented count
-                    G.add_node(
-                        value, field=field, count=prev_count + 1
-                    )  # Add an edge with attributes showing which fields are being connected
+                    G.nodes[value]["count"] += 1
+                seen_values.add(value)  # Mark this value as seen in this row
 
-            # # TODO: remove?
+        # Add edges between combinations of values
+        for (field1, value1), (field2, value2) in combinations(row.items(), r=2):
             if weight_edges:
                 if G.has_edge(value1, value2):
                     G[value1][value2]["count"] += 1
                 else:
                     G.add_edge(value1, value2, count=1, fields={field1, field2})
             else:
-                G.add_edge(value1, value2)  # SIMPLER VERSION
-
+                G.add_edge(value1, value2)
     return G
 
 
