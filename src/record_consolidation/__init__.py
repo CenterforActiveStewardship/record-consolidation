@@ -1,4 +1,4 @@
-from .df_consolidations import consolidate_normalized_table
+from .df_consolidations import extract_normalized_atomic
 
-__all__ = ["consolidate_normalized_table"]
-__version__ = "0.1.0"
+__all__ = ["extract_normalized_atomic"]
+__version__ = "0.2.0"
