@@ -1,14 +1,20 @@
 from typing import Any, Literal
+from warnings import warn
 
 import networkx as nx
 import polars as pl
 
 from record_consolidation.graphs import (
+    _create_field_val_to_canonical_lookup,
     _extract_canonicals_from_subgraph,
     extract_consolidation_mapping_from_graph,
     unconsolidated_df_to_graph,
 )
-from record_consolidation.utils import extract_connected_subgraphs
+from record_consolidation.utils import (
+    assign_columns_if_missing,
+    extract_connected_subgraphs,
+    extract_null_counts,
+)
 
 
 def consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
@@ -167,3 +173,178 @@ def extract_normalized_atomic(df: pl.DataFrame) -> pl.DataFrame:
     for subg in extract_connected_subgraphs(g):
         df_precursor.append(_extract_canonicals_from_subgraph(subg, "max_n"))
     return pl.DataFrame(df_precursor)
+
+
+def normalize_subset(
+    df: pl.DataFrame,
+    cols_to_normalize: list[str] | Literal["all"] = "all",
+    leave_potential_dupes_in_output: bool = True,
+) -> pl.DataFrame:
+    """
+    Replaces a subset of columns in the DataFrame with their normalized (canonical) values.
+
+    Normalization is the process of converting data to a standard or consistent form. This function takes a DataFrame
+    and a list of columns to normalize. It creates a lookup table for the normalized values of the specified columns
+    and replaces the original values in these columns with their normalized counterparts. If "all" is specified, all columns
+    in the DataFrame are normalized.
+
+    The normalization process involves:
+    1. Creating a graph where each unique value in the DataFrame is represented as a node, and edges represent co-occurrences
+       of these values within the same row.
+    2. Extracting connected subgraphs from this graph and determining the normalized/canonical value for each field within these subgraphs.
+    3. Constructing a nested dictionary where each field maps to another dictionary that maps each value to its normalized values
+       across all fields.
+    4. Replacing the original values in the DataFrame with their normalized counterparts based on the lookup table.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame containing the data to be normalized.
+        cols_to_normalize (list[str] | Literal["all"] = "all"): The columns to be normalized. If "all", all columns in the DataFrame are normalized.
+        leave_potential_dupes_in_output (bool): If True, potential duplicate rows are left in the output. If False, duplicate rows are removed.
+
+
+    Returns:
+        pl.DataFrame: A new DataFrame with the specified columns replaced by their normalized values.
+
+    Raises:
+        KeyError: If a value in the DataFrame does not have a corresponding normalized value in the lookup table.
+    """
+    warn(
+        "DEPRECATED: use `normalize_subset_via_joins` instead (there's an issue with this function that I can't recall this second :<{ )."
+    )
+    if cols_to_normalize == "all":
+        subset_selector: list[str] = df.columns
+    else:
+        subset_selector = cols_to_normalize
+    subset: pl.DataFrame = df.select(pl.col(subset_selector))
+
+    field_val_to_canonical_lookup: dict[str, dict[Any, dict[str, Any]]] = (
+        _create_field_val_to_canonical_lookup(subset)
+    )
+
+    normalized_subset_precursor: list[dict[str, Any]] = []
+    for row in subset.rows(named=True):
+        for field, value in row.items():
+            if value is not None:
+                normalized_subset_precursor.append(
+                    field_val_to_canonical_lookup[field][value]
+                )
+                break
+
+    normalized_subset: pl.DataFrame = pl.DataFrame(normalized_subset_precursor)
+
+    if cols_to_normalize == "all":
+        return normalized_subset
+
+    normalized_subset = assign_columns_if_missing(
+        assign_to=normalized_subset, assign_from=df, cols=subset_selector
+    )
+
+    reunited_subsets: pl.DataFrame = pl.concat(
+        [normalized_subset, df.select(pl.exclude(subset_selector))], how="horizontal"
+    ).select(
+        pl.col(df.columns)
+    )  # reorder cols to original
+
+    if reunited_subsets.shape != df.shape:
+        raise ValueError(f"{reunited_subsets.shape=} != {df.shape=}")
+    if not reunited_subsets.select(pl.exclude(subset_selector)).equals(
+        df.select(pl.exclude(subset_selector))
+    ):
+        raise ValueError("Columns excluded from normalization should NOT have changed.")
+
+    if not leave_potential_dupes_in_output:
+        reunited_subsets = reunited_subsets.unique()
+
+    return reunited_subsets
+
+
+def normalize_subset_via_joins(
+    df: pl.DataFrame,
+    cols_to_normalize: list[str] | Literal["all"] = "all",
+    leave_potential_dupes_in_output: bool = True,
+) -> pl.DataFrame:
+    """
+    Normalizes a subset of columns in the DataFrame using join operations to replace values with their canonical counterparts.
+
+    This function takes a DataFrame and a list of columns to normalize. It performs intra-field consolidation on the specified columns,
+    extracts canonical values, and uses join operations to replace the original values with their canonical counterparts. If "all" is specified,
+    all columns in the DataFrame are normalized.
+
+    The normalization process involves:
+    1. Performing intra-field consolidation on the specified columns.
+    2. Extracting canonical values for each field within the consolidated columns.
+    3. Using join operations to replace the original values in the DataFrame with their canonical counterparts.
+    4. Ensuring that the columns excluded from normalization remain unchanged.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame containing the data to be normalized.
+        cols_to_normalize (list[str] | Literal["all"] = "all"): The columns to be normalized. If "all", all columns in the DataFrame are normalized.
+        leave_potential_dupes_in_output (bool): If True, potential duplicate rows are left in the output. If False, duplicate rows are removed.
+
+    Returns:
+        pl.DataFrame: A new DataFrame with the specified columns replaced by their normalized values.
+
+    Raises:
+        ValueError: If the shape of the reunited subsets does not match the original DataFrame.
+        ValueError: If columns excluded from normalization have changed.
+    """
+    if cols_to_normalize == "all":
+        subset_selector: list[str] = df.columns
+    else:
+        subset_selector = cols_to_normalize
+    subset: pl.DataFrame = (
+        df.select(pl.col(subset_selector))
+        .pipe(consolidate_intra_field)
+        .with_columns(pl.lit(None).alias("canonical_row"))  # .cast(pl.Struct)
+    )
+
+    ##### ADD `canonical_row` STRUCT COL TO `subset`
+    subset_null_counts: dict[str, int] = extract_null_counts(subset)
+
+    atomized_subset = extract_normalized_atomic(subset).with_columns(
+        pl.struct(pl.all()).alias("canonical_row")
+    )
+    already_tried: set[str] = set(["canonical_row"])
+    while subset.select(
+        pl.col("canonical_row").is_null().any()
+    ).item() and already_tried != set(subset.columns):
+        subset_null_counts = extract_null_counts(subset)
+        least_null_col: str = min({k: v for k, v in subset_null_counts.items() if k not in already_tried}, key=subset_null_counts.get)  # type: ignore
+        already_tried.update(set([least_null_col]))
+        subset = (
+            subset.join(
+                atomized_subset.select(pl.col([least_null_col, "canonical_row"])),
+                how="left",
+                on=least_null_col,
+                # validate="m:1",
+            )
+            .with_columns(
+                pl.col("canonical_row").fill_null(pl.col("canonical_row_right"))
+            )
+            .drop("canonical_row_right")
+        )
+
+    ##### /ADD `canonical_row` STRUCT COL TO `subset`
+    subset = (
+        subset.select(pl.col("canonical_row"))
+        .unnest("canonical_row")
+        .pipe(assign_columns_if_missing, assign_from=df, cols=subset_selector)
+    )
+
+    reunited_subsets: pl.DataFrame = pl.concat(
+        [subset, df.select(pl.exclude(subset_selector))], how="horizontal"
+    ).select(
+        pl.col(df.columns)
+    )  # reorder cols to original
+
+    if reunited_subsets.shape != df.shape:
+        raise ValueError(f"{reunited_subsets.shape=} != {df.shape=}")
+    if not reunited_subsets.select(pl.exclude(subset_selector)).equals(
+        df.select(pl.exclude(subset_selector))
+    ):
+        raise ValueError("Columns excluded from normalization should NOT have changed.")
+
+    if not leave_potential_dupes_in_output:
+        reunited_subsets = reunited_subsets.unique()
+
+    return reunited_subsets

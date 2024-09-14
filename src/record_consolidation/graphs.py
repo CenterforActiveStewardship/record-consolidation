@@ -27,7 +27,7 @@ def unconsolidated_df_to_graph(
         nx.Graph: A NetworkX graph where nodes represent unique attribute values and edges represent
                   co-occurrences of these values within the same row of the DataFrame.
     """
-    df = df.select(pl.all().replace(["", "N/A"], None))
+    df = df.with_columns(pl.col(pl.String).replace(["", "N/A"], None))
     G: nx.Graph = nx.Graph()
     for row in df.rows(named=True):
         row = {k: v for k, v in row.items() if v is not None}
@@ -166,3 +166,94 @@ def extract_consolidation_mapping_from_graph(g: nx.Graph) -> dict[str, dict[str,
             # e.g. ("cusip", {'594918104': '594918104', '594918105': '594918104'})
             overall_consolidations[field].update(field_mapping)
     return overall_consolidations
+
+
+def _create_field_val_to_canonical_lookup(
+    df: pl.DataFrame,
+) -> dict[str, dict[Any, dict[str, Any]]]:
+    """
+    Creates a lookup dictionary mapping each field value to its canonical values across all fields.
+
+    This function processes an input DataFrame to generate a NetworkX graph where nodes represent unique
+    attribute values and edges represent co-occurrences of these values within the same row. It then extracts
+    connected subgraphs from this graph and determines the canonical value for each field within these subgraphs.
+    Finally, it constructs a nested dictionary where each field maps to another dictionary that maps each value
+    to its canonical values across all fields.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame containing entity attributes.
+
+    Returns:
+        dict[str, dict[Any, dict[str, Any]]]: A nested dictionary where the outer keys are field names, the
+                                              middle keys are field values, and the inner dictionary maps
+                                              each field value to its canonical values across all fields.
+
+    Example:
+        Input DataFrame:
+            ┌───────────────────────┬────────────┬───────────────┬───────────────────┐
+            │ issuer_name           ┆ cusip      ┆ isin          ┆ figi              │
+            ├───────────────────────┼────────────┼───────────────┼───────────────────┤
+            │ MICROSOFT CORPORATION ┆ 594918104  ┆ US5949181045  ┆ MSFT              │
+            │ MICROSOFT CORP        ┆ 594918105  ┆ US5949181055  ┆ MSFT              │
+            │ APPLE INC             ┆ 037833100  ┆ US0378331005  ┆ AAPL              │
+            └───────────────────────┴────────────┴───────────────┴───────────────────┘
+
+        Output:
+        {
+            'issuer_name': {
+                'MICROSOFT CORPORATION': {
+                    'issuer_name': 'MICROSOFT CORPORATION',
+                    'cusip': '594918104',
+                    'isin': 'US5949181045',
+                    'figi': 'MSFT'
+                },
+                ...,
+            },
+            'cusip': {
+                '594918104': {
+                    'issuer_name': 'MICROSOFT CORPORATION',
+                    'cusip': '594918104',
+                    'isin': 'US5949181045',
+                    'figi': 'MSFT'
+                },
+                ...,
+            },
+            'isin': {
+                'US5949181045': {
+                    'issuer_name': 'MICROSOFT CORPORATION',
+                    'cusip': '594918104',
+                    'isin': 'US5949181045',
+                    'figi': 'MSFT'
+                },
+                ...,
+            },
+            'figi': {
+                'MSFT': {
+                    'issuer_name': 'MICROSOFT CORPORATION',
+                    'cusip': '594918104',
+                    'isin': 'US5949181045',
+                    'figi': 'MSFT'
+                },
+                ...,
+            }
+        }
+    """
+    mapping: dict[
+        str,  # field, e.g., "issuer_name"
+        dict[
+            Any,  # value, e.g., "MICROSOFT CORPORATION"
+            dict[  # canonical vals for this field-value pair (e.g., `{'figi': 'MSFT', 'issuer_name': 'MICROSOFT CORPORATION', 'cusip': '594918104', 'isin': 'US5949181045'}`)
+                str,  # field name
+                Any,  # canonical value
+            ],
+        ],
+    ] = {field: dict() for field in df.columns}
+    G: nx.Graph = unconsolidated_df_to_graph(df)
+    for subg in extract_connected_subgraphs(G):
+        canonical: dict[str, Any] = _extract_canonicals_from_subgraph(subg, "max_n")
+        for value, field_and_count in G.nodes(data=True):
+            # e.g., `('MICROSOFT CORPORATION', {'field': 'issuer_name', 'count': 6}`
+            field: str = field_and_count["field"]
+            if value not in mapping[field]:
+                mapping[field][value] = canonical
+    return mapping
