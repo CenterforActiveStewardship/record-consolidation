@@ -37,6 +37,7 @@ def _consolidate_inter_field(
     df: pl.DataFrame,
     confirm_input_was_intra_field_consolidated: bool = False,
     already_tried: set[str] = set(),
+    verbose: bool = False,
 ) -> pl.DataFrame:
     """
     Recursively consolidates fields within a DataFrame by filling null values,
@@ -79,8 +80,10 @@ def _consolidate_inter_field(
             )
 
     null_counts: dict[str, int] = df.select(pl.all().is_null().sum()).to_dicts()[0]
-    # print(f"{null_counts=}")
-    print(f"{already_tried=}")
+    if verbose:
+        print("\n")
+        print(f"{already_tried=}")
+        print(f"{null_counts=}")
     if all(count == 0 for count in null_counts.values()):
         print("df has been inter-consolidated; returning.")
         return df
