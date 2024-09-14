@@ -28,7 +28,7 @@ def consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
         extract_consolidation_mapping_from_graph(df_as_graph)
     )
     return df.with_columns(
-        pl.col(field).replace_strict(mapping)
+        pl.col(field).replace_strict(mapping, default=None)
         for field, mapping in consolidation_mapping.items()
     )
 
