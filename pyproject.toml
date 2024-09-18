@@ -8,6 +8,7 @@ authors = [
 dependencies = [
     "networkx>=3.3",
     "polars>=1.7.1",
+    "regression-tester @ git+https://github.com/m-gaster/regression-tester",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"

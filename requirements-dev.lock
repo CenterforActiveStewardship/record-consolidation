@@ -115,7 +115,8 @@ pyyaml==6.0.2
 pyzmq==26.2.0
     # via ipykernel
     # via jupyter-client
-regression-tester @ git+https://github.com/m-gaster/regression-tester@1ec06297f7dee4138e08b120d691d557ed2b09b3
+regression-tester @ git+https://github.com/m-gaster/regression-tester@97e54fa16bccba5dfe956c3244003ec962292424
+    # via record-consolidation
 ruff==0.6.5
 six==1.16.0
     # via asttokens

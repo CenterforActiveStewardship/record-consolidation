@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from warnings import warn
 
 import networkx as nx
@@ -262,6 +262,7 @@ def normalize_subset(
     df: pl.DataFrame,
     cols_to_normalize: list[str] | Literal["all"] = "all",
     leave_potential_dupes_in_output: bool = True,
+    atomized_subset: pl.DataFrame | None = None,
 ) -> pl.DataFrame:
     """
     Normalizes a subset of columns in the DataFrame using join operations to replace values with their canonical counterparts.
@@ -280,6 +281,9 @@ def normalize_subset(
         df (pl.DataFrame): The input DataFrame containing the data to be normalized.
         cols_to_normalize (list[str] | Literal["all"] = "all"): The columns to be normalized. If "all", all columns in the DataFrame are normalized.
         leave_potential_dupes_in_output (bool): If True, potential duplicate rows are left in the output. If False, duplicate rows are removed.
+        atomized_subset (Optional[pl.DataFrame]): The atomized subset containing all unique/canonical/normalized relationships which we want to bring
+            into `df`. If None, this will be automatically extracted from the `subset` (which should lead to identical `atomized_subset_w_canonical_row` variables,
+            and therefore identical output).
 
     Returns:
         pl.DataFrame: A new DataFrame with the specified columns replaced by their normalized values.
@@ -301,11 +305,17 @@ def normalize_subset(
     )
 
     ##### ADD `canonical_row` STRUCT COL TO `subset`
-    subset_null_counts: dict[str, int] = extract_null_counts(subset)
 
-    atomized_subset = extract_normalized_atomic(subset).with_columns(
+    # Atomize subset if not passed as arg
+    if atomized_subset is None:
+        atomized_subset = cast(pl.DataFrame, extract_normalized_atomic(subset))
+
+    atomized_subset_w_canonical_row = atomized_subset.with_columns(
         pl.struct(pl.all()).alias("canonical_row")
     )
+
+    #
+    subset_null_counts: dict[str, int] = extract_null_counts(subset)
     already_tried: set[str] = set(["canonical_row"])
     while subset.select(
         pl.col("canonical_row").is_null().any()
@@ -315,10 +325,12 @@ def normalize_subset(
         already_tried.update(set([least_null_col]))
         subset = (
             subset.join(
-                atomized_subset.select(pl.col([least_null_col, "canonical_row"])),
+                atomized_subset_w_canonical_row.select(
+                    pl.col([least_null_col, "canonical_row"])
+                ),
                 how="left",
                 on=least_null_col,
-                # validate="m:1",
+                # validate="m:1", # TODO
             )
             .with_columns(
                 pl.col("canonical_row").fill_null(pl.col("canonical_row_right"))

@@ -8,6 +8,7 @@ from record_consolidation.df_consolidations import (
     _consolidate_normalized_table_deprecated,
     _normalize_subset_deprecated,
     extract_normalized_atomic,
+    normalize_subset,
 )
 
 
@@ -77,7 +78,7 @@ def test_normalization_via_subset_normalizer(MSFTS) -> None:
     reg_tester.execute_regression_test()
 
 
-def test_subset_normalizer() -> None:
+def test_deprecated_subset_normalizer() -> None:
     root_path = Path("test_data/normalize_subset")
     input_path = root_path / "input.parquet"
     snapshot_path = root_path / "processed.parquet"
@@ -98,6 +99,24 @@ def test_subset_normalizer() -> None:
     )
 
 
-def test_subset_normalizer_via_joins() -> None:
-    # TODO
-    pass
+def test_subset_normalizer() -> None:
+    root_path = Path("test_data/normalize_subset")
+    input_path = root_path / "input.parquet"
+    snapshot_path = root_path / "processed.parquet"
+
+    raw_input: pl.DataFrame = pl.read_parquet(input_path).filter(
+        pl.col("issuer_name") == pl.lit("MICROSOFT CORPORATION")
+    )
+    locally_processed: pl.DataFrame = normalize_subset(
+        raw_input, cols_to_normalize=["issuer_name", "cusip", "isin", "figi"]
+    )
+    snapshot: pl.DataFrame = pl.read_parquet(snapshot_path)
+
+    compare_dataframes(
+        locally_processed,
+        snapshot,
+        "locally_processed",
+        "snapshot",
+        comparison_export_path=root_path / "reg_test_comparison.csv",
+        raise_if_schema_difference=True,
+    )

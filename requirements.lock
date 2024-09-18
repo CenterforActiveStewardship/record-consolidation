@@ -9,7 +9,44 @@
 #   generate-hashes: false
 
 -e file:.
+annotated-types==0.7.0
+    # via pydantic
+iniconfig==2.0.0
+    # via pytest
 networkx==3.3
     # via record-consolidation
+numpy==2.1.1
+    # via pandas
+    # via pyarrow
+packaging==24.1
+    # via pytest
+pandas==2.2.2
+    # via regression-tester
+pluggy==1.5.0
+    # via pytest
 polars==1.7.1
     # via record-consolidation
+    # via regression-tester
+pyarrow==17.0.0
+    # via regression-tester
+pydantic==2.9.2
+    # via regression-tester
+pydantic-core==2.23.4
+    # via pydantic
+pytest==8.3.3
+    # via pytest-mock
+pytest-mock==3.14.0
+    # via regression-tester
+python-dateutil==2.9.0.post0
+    # via pandas
+pytz==2024.2
+    # via pandas
+regression-tester @ git+https://github.com/m-gaster/regression-tester@97e54fa16bccba5dfe956c3244003ec962292424
+    # via record-consolidation
+six==1.16.0
+    # via python-dateutil
+typing-extensions==4.12.2
+    # via pydantic
+    # via pydantic-core
+tzdata==2024.1
+    # via pandas
