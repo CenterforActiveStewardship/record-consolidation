@@ -5,9 +5,9 @@ import pytest
 from regression_tester import RegressionTestPackage, compare_dataframes
 
 from record_consolidation.df_consolidations import (
-    consolidate_normalized_table,
+    _consolidate_normalized_table_deprecated,
+    _normalize_subset_deprecated,
     extract_normalized_atomic,
-    normalize_subset,
 )
 
 
@@ -35,7 +35,9 @@ def test_normalization(MSFTS, depth) -> None:
     raw_input_path = root_path / "msfts_and_amzns.parquet"
     reg_tester = RegressionTestPackage(
         root_path=root_path,
-        extraction_fnc=lambda _: consolidate_normalized_table(MSFTS, depth=depth)
+        extraction_fnc=lambda _: _consolidate_normalized_table_deprecated(
+            MSFTS, depth=depth
+        )
         .unique()
         .sort(pl.all()),
         optional_raw_input_path=raw_input_path,  # have to put an extant path here
@@ -67,7 +69,9 @@ def test_normalization_via_subset_normalizer(MSFTS) -> None:
     raw_input_path = root_path / "msfts_and_amzns.parquet"
     reg_tester = RegressionTestPackage(
         root_path=root_path,
-        extraction_fnc=lambda x: normalize_subset(MSFTS, "all").unique().sort(pl.all()),
+        extraction_fnc=lambda x: _normalize_subset_deprecated(MSFTS, "all")
+        .unique()
+        .sort(pl.all()),
         optional_raw_input_path=raw_input_path,  # have to put an extant path here
     )
     reg_tester.execute_regression_test()
@@ -79,7 +83,7 @@ def test_subset_normalizer() -> None:
     snapshot_path = root_path / "processed.parquet"
 
     raw_input: pl.DataFrame = pl.read_parquet(input_path)
-    locally_processed: pl.DataFrame = normalize_subset(
+    locally_processed: pl.DataFrame = _normalize_subset_deprecated(
         raw_input, cols_to_normalize=["issuer_name", "cusip", "isin", "figi"]
     )
     snapshot: pl.DataFrame = pl.read_parquet(snapshot_path)

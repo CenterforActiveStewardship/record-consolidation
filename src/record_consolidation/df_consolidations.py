@@ -17,7 +17,7 @@ from record_consolidation.utils import (
 )
 
 
-def consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
+def _consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
     """
     Consolidates fields within a DataFrame by mapping each field's values to their canonical values.
 
@@ -41,7 +41,7 @@ def consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _consolidate_inter_field(
+def __consolidate_inter_field(
     df: pl.DataFrame,
     confirm_input_was_intra_field_consolidated: bool = False,
     already_tried: set[str] = set(),
@@ -118,12 +118,12 @@ def _consolidate_inter_field(
 
     already_tried.add(least_null_field)
     # TODO: qa uniqueness of output vals? But output vals will only be unique if consolidation perfectly takes replaces all nulls, which won't always happen
-    return _consolidate_inter_field(
+    return __consolidate_inter_field(
         output, confirm_input_was_intra_field_consolidated, already_tried=already_tried
     )
 
 
-def consolidate_normalized_table(
+def _consolidate_normalized_table_deprecated(
     df: pl.DataFrame,
     depth: Literal["intra_field", "intra_and_inter_field"],
 ) -> pl.DataFrame:
@@ -144,12 +144,12 @@ def consolidate_normalized_table(
 
     Raises:
         ValueError: If an invalid depth is provided."""
-    consolidated_intra_field: pl.DataFrame = df.pipe(consolidate_intra_field)
+    consolidated_intra_field: pl.DataFrame = df.pipe(_consolidate_intra_field)
     match depth:
         case "intra_field":
             return consolidated_intra_field.unique()
         case "intra_and_inter_field":
-            return consolidated_intra_field.pipe(_consolidate_inter_field).unique()
+            return consolidated_intra_field.pipe(__consolidate_inter_field).unique()
         case _:
             raise ValueError(depth)
 
@@ -175,7 +175,7 @@ def extract_normalized_atomic(df: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(df_precursor)
 
 
-def normalize_subset(
+def _normalize_subset_deprecated(
     df: pl.DataFrame,
     cols_to_normalize: list[str] | Literal["all"] = "all",
     leave_potential_dupes_in_output: bool = True,
@@ -258,7 +258,7 @@ def normalize_subset(
     return reunited_subsets
 
 
-def normalize_subset_via_joins(
+def normalize_subset(
     df: pl.DataFrame,
     cols_to_normalize: list[str] | Literal["all"] = "all",
     leave_potential_dupes_in_output: bool = True,
@@ -288,13 +288,15 @@ def normalize_subset_via_joins(
         ValueError: If the shape of the reunited subsets does not match the original DataFrame.
         ValueError: If columns excluded from normalization have changed.
     """
+    # TODO: add `atomized_subset` as an optional arg
+
     if cols_to_normalize == "all":
         subset_selector: list[str] = df.columns
     else:
         subset_selector = cols_to_normalize
     subset: pl.DataFrame = (
         df.select(pl.col(subset_selector))
-        .pipe(consolidate_intra_field)
+        .pipe(_consolidate_intra_field)
         .with_columns(pl.lit(None).alias("canonical_row"))  # .cast(pl.Struct)
     )
 
