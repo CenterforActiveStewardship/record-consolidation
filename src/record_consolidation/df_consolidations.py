@@ -1,23 +1,23 @@
 from typing import Any, Literal, cast
 
-import networkx as nx
 import polars as pl
 
 from record_consolidation.graphs import (
-    _extract_canonicals_from_subgraph,  # TODO: shouldn't be importing private class
-)
-from record_consolidation.graphs import (
-    extract_consolidation_mapping_from_graph,
-    unconsolidated_df_to_graph,
+    extract_consolidation_mapping_from_subgraphs,
+    extract_normalized_atomic,
+    unconsolidated_df_to_subgraphs,
 )
 from record_consolidation.utils import (
+    GraphGenerator,
+    GraphPostProcessorFnc,
     assign_columns_if_missing,
-    extract_connected_subgraphs,
     extract_null_counts,
 )
 
 
-def _consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
+def _consolidate_intra_field(
+    df: pl.DataFrame, connected_subgraphs_postprocessor: GraphPostProcessorFnc | None
+) -> pl.DataFrame:
     """
     Consolidates fields within a DataFrame by mapping each field's values to their canonical values.
 
@@ -31,9 +31,13 @@ def _consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: A new DataFrame with values consolidated within each field.
     """
-    df_as_graph: nx.Graph = unconsolidated_df_to_graph(df, weight_edges=False)
+    df_as_subgraphs: GraphGenerator = unconsolidated_df_to_subgraphs(
+        df,
+        weight_edges=False,
+        connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
+    )
     consolidation_mapping: dict[str, dict[str, Any]] = (
-        extract_consolidation_mapping_from_graph(df_as_graph)
+        extract_consolidation_mapping_from_subgraphs(df_as_subgraphs)
     )
     return df.with_columns(
         pl.col(field).replace_strict(mapping, default=None)
@@ -41,111 +45,9 @@ def _consolidate_intra_field(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def __consolidate_inter_field(
-    df: pl.DataFrame,
-    confirm_input_was_intra_field_consolidated: bool = False,
-    already_tried: set[str] = set(),
-    verbose: bool = False,
-) -> pl.DataFrame:
-    """
-    Recursively consolidates fields within a DataFrame by filling null values,
-    using the field with the least nulls as a lookup to the canonical.
-
-    This function identifies the field with the least number of null values and uses it as a reference to fill
-    null values in other fields. It ensures that no null values remain, otherwise,
-    it recursively consolidates the DataFrame until no null values remain or all fields have been tried.
-
-    NOTE: fields must have already been consolidated within themselves ("intra_field").
-        If not, values will be propagated randomly (and likely incorrectly).
-
-    Args:
-        df (pl.DataFrame): The input DataFrame to be consolidated.
-        confirm_input_was_intra_field_consolidated (bool): If true, will check that the input DataFrame was already consolidated intra-field and will raise an error if not. NOTE: this is an expensive operation, so default is False.
-        already_tried (set[str]): A set of fields that have already been used as the basis for consolidation in previous recursive calls.
-
-    Returns:
-        pl.DataFrame: A new DataFrame with null values filled based on the field with the least nulls.
-
-    Raises:
-        ValueError: If the input DataFrame is not intra-field consolidated when required.
-        ValueError: If all fields have some null values, making it unsafe to consolidate with this logic.
-    """
-    if confirm_input_was_intra_field_consolidated:
-        # Create a consolidation mapping from the DataFrame
-        df_as_graph: nx.Graph = unconsolidated_df_to_graph(df, weight_edges=False)
-        consolidation_mapping: dict[str, dict[str, Any]] = (
-            extract_consolidation_mapping_from_graph(df_as_graph)
-        )
-        # Apply the consolidation mapping to the DataFrame
-        consolidated_df: pl.DataFrame = df.with_columns(
-            pl.col(field).replace_strict(mapping)
-            for field, mapping in consolidation_mapping.items()
-        )
-        # Check if the DataFrame remains unchanged
-        if not df.equals(consolidated_df):
-            raise ValueError(
-                "The input DataFrame does not appear to be intra-field consolidated."
-            )
-
-    null_counts: dict[str, int] = df.select(pl.all().is_null().sum()).to_dicts()[0]
-    if verbose:
-        print("\n")
-        print(f"{already_tried=}")
-        print(f"{null_counts=}")
-    if all(count == 0 for count in null_counts.values()):
-        print("df has been inter-consolidated; returning.")
-        return df
-    if set(df.columns) == already_tried:
-        print(
-            f"df has been inter-consolidated to the maximum extent possible; returning.\n{null_counts=}\n{df.shape=}"
-        )
-        return df
-
-    least_null_field: str = min(null_counts, key=null_counts.get)  # type: ignore
-    if least_null_field in already_tried:
-        least_null_field = min(
-            {k: v for k, v in null_counts.items() if k not in already_tried},
-            key=null_counts.get,  # type: ignore
-        )  # get next least null field as basis of consolidation
-
-    lf: pl.LazyFrame = df.lazy()
-    for field in df.columns:
-        if null_counts[field] > 0:
-            lf = lf.with_columns(
-                pl.col(field).fill_null(strategy="max").over(pl.col(least_null_field))
-            )
-    output = lf.collect()
-
-    already_tried.add(least_null_field)
-    # TODO: qa uniqueness of output vals? But output vals will only be unique if consolidation perfectly takes replaces all nulls, which won't always happen
-    return __consolidate_inter_field(
-        output, confirm_input_was_intra_field_consolidated, already_tried=already_tried
-    )
-
-
-def extract_normalized_atomic(df: pl.DataFrame) -> pl.DataFrame:
-    """
-    Extracts a normalized atomic DataFrame from the input DataFrame.
-
-    This function converts the input DataFrame into a graph, processes its connected subgraphs to extract
-    canonical values for each field, and then constructs a new DataFrame from these canonical values.
-
-    Args:
-        df (pl.DataFrame): The input DataFrame containing entity attributes.
-
-    Returns:
-        pl.DataFrame: A new DataFrame where each row represents a set of canonical values for the fields
-                      present in the input DataFrame.
-    """
-    g: nx.Graph = unconsolidated_df_to_graph(df)
-    df_precursor: list[dict[str, Any]] = []
-    for subg in extract_connected_subgraphs(g):
-        df_precursor.append(_extract_canonicals_from_subgraph(subg, "max_n"))
-    return pl.DataFrame(df_precursor)
-
-
 def normalize_subset(
     df: pl.DataFrame,
+    connected_subgraphs_postprocessor: GraphPostProcessorFnc | None,
     cols_to_normalize: list[str] | Literal["all"] = "all",
     leave_potential_dupes_in_output: bool = True,
     atomized_subset: pl.DataFrame | None = None,
@@ -186,7 +88,10 @@ def normalize_subset(
         subset_selector = cols_to_normalize
     subset: pl.DataFrame = (
         df.select(pl.col(subset_selector))
-        .pipe(_consolidate_intra_field)
+        .pipe(
+            _consolidate_intra_field,
+            connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
+        )
         .with_columns(pl.lit(None).alias("canonical_row"))  # .cast(pl.Struct)
     )
 
@@ -194,7 +99,13 @@ def normalize_subset(
 
     # Atomize subset if not passed as arg
     if atomized_subset is None:
-        atomized_subset = cast(pl.DataFrame, extract_normalized_atomic(subset))
+        atomized_subset = cast(
+            pl.DataFrame,
+            extract_normalized_atomic(
+                subset,
+                connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
+            ),
+        )
 
     atomized_subset_w_canonical_row = atomized_subset.with_columns(
         pl.struct(pl.all()).alias("canonical_row")

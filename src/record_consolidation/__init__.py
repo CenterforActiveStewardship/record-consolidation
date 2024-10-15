@@ -1,4 +1,5 @@
-from .df_consolidations import extract_normalized_atomic, normalize_subset
+from .df_consolidations import normalize_subset
+from .graphs import extract_normalized_atomic
 
 __all__ = ["extract_normalized_atomic", "normalize_subset"]
-__version__ = "0.2.1"
+__version__ = "0.3.1"

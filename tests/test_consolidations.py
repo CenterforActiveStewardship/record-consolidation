@@ -52,7 +52,9 @@ def test_normalization_via_normalized_atomizer(MSFTS) -> None:
     raw_input_path = root_path / "msfts_and_amzns.parquet"
     reg_tester = RegressionTestPackage(
         root_path=root_path,
-        extraction_fnc=lambda x: extract_normalized_atomic(MSFTS)
+        extraction_fnc=lambda x: extract_normalized_atomic(
+            MSFTS, connected_subgraphs_postprocessor=None
+        )
         .unique()
         .sort(pl.all()),
         optional_raw_input_path=raw_input_path,  # have to put an extant path here
@@ -68,7 +70,11 @@ def test_normalization_via_subset_normalizer(MSFTS) -> None:
     raw_input_path = root_path / "msfts_and_amzns.parquet"
     reg_tester = RegressionTestPackage(
         root_path=root_path,
-        extraction_fnc=lambda x: normalize_subset(MSFTS, "all").unique().sort(pl.all()),
+        extraction_fnc=lambda x: normalize_subset(
+            MSFTS, connected_subgraphs_postprocessor=None, cols_to_normalize="all"
+        )
+        .unique()
+        .sort(pl.all()),
         optional_raw_input_path=raw_input_path,  # have to put an extant path here
     )
     reg_tester.execute_regression_test()
