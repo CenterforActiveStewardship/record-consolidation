@@ -5,12 +5,12 @@ from typing import Any, Callable, Literal
 import networkx as nx
 import polars as pl
 
-from .utils import (
-    GraphGenerator,
-    GraphPostProcessorFnc,
-    extract_connected_subgraphs,
-    remove_string_nulls,
+from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
+from record_consolidation.subgraph_post_processing.apply_alg_to_subgraphs import (
+    apply_post_processor_to_subgraphs,
 )
+from record_consolidation.utils.graphs import extract_connected_subgraphs
+from record_consolidation.utils.polars_df import remove_string_nulls
 
 
 def _convert_to_graph(df: pl.DataFrame, weight_edges: bool) -> nx.Graph:
@@ -42,7 +42,7 @@ def _convert_to_graph(df: pl.DataFrame, weight_edges: bool) -> nx.Graph:
 
 def unconsolidated_df_to_subgraphs(
     df: pl.DataFrame,
-    connected_subgraphs_postprocessor: GraphPostProcessorFnc | None,
+    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
     pre_processing_fnc: (
         Callable[[pl.DataFrame], pl.DataFrame] | None
     ) = remove_string_nulls,  # TODO: remove default for dist
@@ -75,7 +75,9 @@ def unconsolidated_df_to_subgraphs(
     connected_subgraphs: GraphGenerator = extract_connected_subgraphs(G)
 
     if connected_subgraphs_postprocessor is not None:
-        connected_subgraphs = connected_subgraphs_postprocessor(connected_subgraphs)
+        connected_subgraphs = apply_post_processor_to_subgraphs(
+            connected_subgraphs, graphs_post_processor=connected_subgraphs_postprocessor
+        )
 
     return connected_subgraphs
 
@@ -198,7 +200,7 @@ def extract_consolidation_mapping_from_subgraphs(
 
 def extract_normalized_atomic(
     df: pl.DataFrame,
-    connected_subgraphs_postprocessor: GraphPostProcessorFnc | None,
+    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
 ) -> pl.DataFrame:
     """
     Extracts a normalized atomic DataFrame from the input DataFrame.

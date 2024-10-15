@@ -2,21 +2,20 @@ from typing import Any, Literal, cast
 
 import polars as pl
 
+from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
 from record_consolidation.graphs import (
     extract_consolidation_mapping_from_subgraphs,
     extract_normalized_atomic,
     unconsolidated_df_to_subgraphs,
 )
-from record_consolidation.utils import (
-    GraphGenerator,
-    GraphPostProcessorFnc,
+from record_consolidation.utils.polars_df import (
     assign_columns_if_missing,
     extract_null_counts,
 )
 
 
 def _consolidate_intra_field(
-    df: pl.DataFrame, connected_subgraphs_postprocessor: GraphPostProcessorFnc | None
+    df: pl.DataFrame, connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None
 ) -> pl.DataFrame:
     """
     Consolidates fields within a DataFrame by mapping each field's values to their canonical values.
@@ -47,7 +46,7 @@ def _consolidate_intra_field(
 
 def normalize_subset(
     df: pl.DataFrame,
-    connected_subgraphs_postprocessor: GraphPostProcessorFnc | None,
+    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
     cols_to_normalize: list[str] | Literal["all"] = "all",
     leave_potential_dupes_in_output: bool = True,
     atomized_subset: pl.DataFrame | None = None,
