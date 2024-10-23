@@ -2,7 +2,9 @@ import polars as pl
 
 
 def remove_string_nulls(df: pl.DataFrame) -> pl.DataFrame:
-    return df.with_columns(pl.col(pl.String).replace(["", "N/A"], None))
+    return df.with_columns(
+        pl.col(pl.String).str.strip_chars().replace(["", "N/A"], None)
+    )
 
 
 def assign_columns_if_missing(

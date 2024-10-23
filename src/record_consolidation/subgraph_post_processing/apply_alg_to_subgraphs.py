@@ -1,7 +1,6 @@
-from typing import Any
-from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
 import networkx as nx
 
+from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
 from record_consolidation.utils.graphs import extract_connected_subgraphs
 
 
@@ -9,6 +8,7 @@ def apply_post_processor_to_subgraphs(
     subgraphs: GraphGenerator,
     graphs_post_processor: SubGraphPostProcessorFnc,
 ) -> GraphGenerator:
+
     new_subgraphs: list[nx.Graph] = []
     for subg in subgraphs:
         processed_subg: nx.Graph = graphs_post_processor(subg)
@@ -20,4 +20,4 @@ def apply_post_processor_to_subgraphs(
         #     _ps(new_subg)
         # for new_subg in processed_split_subgs:
         #     new_subgraphs.append(new_subg)
-    return new_subgraphs
+    return (x for x in new_subgraphs)  # TODO: actually use generator or change typehint

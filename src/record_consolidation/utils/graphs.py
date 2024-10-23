@@ -1,5 +1,6 @@
-from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
 import networkx as nx
+
+from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
 
 
 def extract_connected_subgraphs(

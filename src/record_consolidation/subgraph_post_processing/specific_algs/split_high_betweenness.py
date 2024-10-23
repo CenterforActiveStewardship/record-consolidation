@@ -3,19 +3,21 @@ from typing import Callable
 
 import networkx as nx
 
-from record_consolidation.graphs import GraphGenerator, extract_connected_subgraphs
+from record_consolidation.graphs import GraphGenerator
 from record_consolidation.utils.draw_graph import draw_graph
+
+
+def get_max_betweenness(G: nx.Graph) -> float:
+    betweennesses: dict[tuple, float] = nx.edge_betweenness_centrality(
+        G, weight="count", normalized=True
+    )
+    return max(betweennesses.values())
 
 
 def _has_high_max_betweenness(G: nx.Graph, threshold: float) -> bool:
     # TODO: this decision rule could be improved for the case of JPMorgan
     # Surely there's something that can measure this perfectly or very well
-    betweennesses: dict[tuple, float] = nx.edge_betweenness_centrality(
-        G, weight="count", normalized=True
-    )
-    max_betweenness: float = max(betweennesses.values())
-    print(f"{max_betweenness=}\n{threshold=}")
-    return max_betweenness >= threshold
+    return get_max_betweenness(G) >= threshold
 
 
 def _total_count(G: nx.Graph) -> int:
@@ -52,14 +54,15 @@ def split_subgraph_where_necessary(
         threshold=0.06,
     ),
     max_cuts: int = 3,
-    verbose: bool = True,
+    verbose: bool = False,
     extra_verbose: bool = False,
 ) -> GraphGenerator:
     # TODO: save cut_points when possible (rather than removing them from the graph). Low priority though, because they account for such a small portion of the total.
     if verbose:
         print("-" * 120)
-        issuer_names: set[str] = _extract_issuer_names(G)
-        print(f"{issuer_names=}")
+        print(f"{_extract_issuer_names(G, just_words=False)=}")
+        print(f"{_extract_issuer_names(G, just_words=True)=}")
+        print(f"{get_max_betweenness(G)=}")
         print(f"{_total_count(G)=}")
 
     if not should_consider_cutting_decider(G):
@@ -74,6 +77,7 @@ def split_subgraph_where_necessary(
     while should_cut(G):
         if extra_verbose:
             print(f"Iteration: {i}")
+            print(f"{get_max_betweenness(G)=}")
 
         cut_points = tuple(nx.articulation_points(G))
         if len(cut_points) == 0 or i > max_cuts:
