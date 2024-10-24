@@ -51,9 +51,16 @@ def check_no_new_nulls(
     cols: list[str],
     on_error: Literal["raise", "warn"],
 ) -> None:
+    """Confirm that no new nulls have been added to the data"""
     for col in cols:
         new_null_idxs: pl.Series = new[col].is_null()
-        if old.select(pl.col(col)).filter(new_null_idxs).to_series().is_null().any():
+        if (
+            old.select(pl.col(col))
+            .filter(new_null_idxs)
+            .to_series()
+            .is_not_null()
+            .any()
+        ):
             warning_str = f"New nulls added -- detected in {col}."
             if on_error == "raise":
                 raise ValueError(warning_str)
@@ -184,7 +191,6 @@ def normalize_subset(
     og_null_count: int = (
         df.select(pl.col(subset_selector).is_null().sum()).sum_horizontal().item()
     )
-    print(f"{new_null_count=:_}, {og_null_count=:_}")
     if new_null_count > og_null_count:
         if atomized_subset is not None:
             atomized_subset_nulls: int = (
