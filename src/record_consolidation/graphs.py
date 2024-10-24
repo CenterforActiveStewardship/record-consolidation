@@ -116,7 +116,9 @@ def _extract_canonicals_from_subgraph(
     match method:
         case "max_n":
             for field in fields:
-                respective_nodes = [n for n in g.nodes if g.nodes[n]["field"] == field]
+                respective_nodes = sorted(  # sort for determinism in the case of a tie
+                    [n for n in g.nodes if g.nodes[n]["field"] == field]
+                )
                 max_n_node = max(respective_nodes, key=lambda x: g.nodes[x]["count"])
                 canonicals[field] = max_n_node
         case _:
