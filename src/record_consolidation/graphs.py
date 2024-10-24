@@ -236,4 +236,4 @@ def extract_normalized_atomic(
     )
     for subg in connected_subgs:
         df_precursor.append(_extract_canonicals_from_subgraph(subg, "max_n"))
-    return pl.DataFrame(df_precursor)
+    return pl.DataFrame(df_precursor).sort(pl.all())
