@@ -1,4 +1,5 @@
 import networkx as nx
+from tqdm.auto import tqdm
 
 from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
 from record_consolidation.utils.graphs import extract_connected_subgraphs
@@ -10,7 +11,8 @@ def apply_post_processor_to_subgraphs(
 ) -> GraphGenerator:
 
     new_subgraphs: list[nx.Graph] = []
-    for subg in subgraphs:
+    print("Post-processing subgraphs.")
+    for subg in tqdm(subgraphs):
         processed_subg: nx.Graph = graphs_post_processor(subg)
         processed_split_subgs: GraphGenerator = extract_connected_subgraphs(
             processed_subg

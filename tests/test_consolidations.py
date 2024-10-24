@@ -53,7 +53,9 @@ def test_normalization_via_normalized_atomizer(MSFTS) -> None:
     reg_tester = RegressionTestPackage(
         root_path=root_path,
         extraction_fnc=lambda x: extract_normalized_atomic(
-            MSFTS, connected_subgraphs_postprocessor=None
+            MSFTS,
+            connected_subgraphs_postprocessor=None,
+            pre_processing_fnc=None,
         )
         .unique()
         .sort(pl.all()),

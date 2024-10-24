@@ -63,6 +63,8 @@ python-dateutil==2.9.0.post0
     # via pandas
 pytz==2024.2
     # via pandas
+rapidfuzz==3.10.0
+    # via record-consolidation
 regression-tester @ git+https://github.com/m-gaster/regression-tester@97e54fa16bccba5dfe956c3244003ec962292424
     # via record-consolidation
 scikit-learn==1.5.2
@@ -73,6 +75,8 @@ six==1.16.0
     # via python-dateutil
 threadpoolctl==3.5.0
     # via scikit-learn
+tqdm==4.66.5
+    # via record-consolidation
 typing-extensions==4.12.2
     # via pydantic
     # via pydantic-core

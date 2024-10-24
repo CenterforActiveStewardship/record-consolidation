@@ -37,6 +37,16 @@ def _convert_to_graph(df: pl.DataFrame, weight_edges: bool) -> nx.Graph:
                     G.add_edge(value1, value2, count=1, fields={field1, field2})
             else:
                 G.add_edge(value1, value2)
+
+    # confirm that all values made it into the graph
+    for field in df.columns:
+        n_non_null: int = df.select(pl.col(field).is_not_null().sum()).item()
+        graph_total_count_for_field: int = sum(
+            x[1]["count"] for x in G.nodes.data() if x[1]["field"] == field
+        )
+        if graph_total_count_for_field != n_non_null:
+            raise ValueError(graph_total_count_for_field, n_non_null)
+
     return G
 
 
@@ -201,6 +211,7 @@ def extract_consolidation_mapping_from_subgraphs(
 def extract_normalized_atomic(
     df: pl.DataFrame,
     connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
+    pre_processing_fnc: Callable[[pl.DataFrame], pl.DataFrame] | None,
 ) -> pl.DataFrame:
     """
     Extracts a normalized atomic DataFrame from the input DataFrame.
@@ -218,6 +229,7 @@ def extract_normalized_atomic(
     df_precursor: list[dict[str, Any]] = []
     connected_subgs: GraphGenerator = unconsolidated_df_to_subgraphs(
         df,
+        pre_processing_fnc=pre_processing_fnc,
         connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
     )
     for subg in connected_subgs:

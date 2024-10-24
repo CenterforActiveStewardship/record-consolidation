@@ -143,6 +143,8 @@ pyyaml==6.0.2
 pyzmq==26.2.0
     # via ipykernel
     # via jupyter-client
+rapidfuzz==3.10.0
+    # via record-consolidation
 regression-tester @ git+https://github.com/m-gaster/regression-tester@97e54fa16bccba5dfe956c3244003ec962292424
     # via record-consolidation
 ruff==0.6.5
@@ -160,6 +162,8 @@ threadpoolctl==3.5.0
 tornado==6.4.1
     # via ipykernel
     # via jupyter-client
+tqdm==4.66.5
+    # via record-consolidation
 traitlets==5.14.3
     # via comm
     # via ipykernel

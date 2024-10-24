@@ -2,8 +2,16 @@ import polars as pl
 
 
 def remove_string_nulls(df: pl.DataFrame) -> pl.DataFrame:
+    return df.with_columns(pl.col(pl.String).replace(["", "N/A"], None))
+
+
+def remove_string_nulls_and_uppercase(df: pl.DataFrame) -> pl.DataFrame:
     return df.with_columns(
-        pl.col(pl.String).str.strip_chars().replace(["", "N/A"], None)
+        pl.col(pl.String)
+        .str.to_uppercase()
+        .str.strip_chars()
+        .str.replace_all(r"\s+", " ")
+        .replace(["", "N/A"], None)
     )
 
 
