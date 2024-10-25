@@ -20,10 +20,8 @@ Under the hood, `record-consolidation` converts input dataframes into a `network
   Disc Vectors by Vecteezy
 </a> -->
 
-<div style="text-align: center;">
-    <img src="image.png" alt="drawing" width="200" style="display: block; margin: 0 auto;" />
-</div>
-
+<div align="center">
+  <img src="image.png" alt="drawing" style="width: 120px;">
 </div>
 
 # record-consolidation: Record Unification in Python
@@ -32,7 +30,7 @@ Under the hood, `record-consolidation` converts input dataframes into a `network
 
 - Natural linkage-based consolidation
 - Flexible graph partitioning
-- Built with `polars` and `networkx` for speed and scalability
+- Built with `polars` and `networkx` for speed
 
 ## Overview
 
