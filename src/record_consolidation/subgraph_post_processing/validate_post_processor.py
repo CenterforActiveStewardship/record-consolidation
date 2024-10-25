@@ -164,22 +164,3 @@ def repopulate_missing_nodes(graph_arg_name="G") -> Callable:
         return wrapper
 
     return decorator
-
-
-if __name__ == "__main__":
-
-    def _test_validation(G: nx.Graph, G2: nx.Graph) -> bool:
-        return len(G.nodes()) > 0
-
-    @repopulate_missing_nodes(graph_arg_name="G")
-    def example_graph_operation(G, **kwargs):
-        # Modify the graph as needed, here we just return the same graph for demo purposes
-        return G
-
-    # Create a test graph
-    G = nx.path_graph(5)
-
-    # Call the decorated function
-    output_graph = example_graph_operation(G, some_param="example")
-
-    print(output_graph.nodes)

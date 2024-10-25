@@ -18,8 +18,4 @@ def apply_post_processor_to_subgraphs(
             processed_subg
         )  # split the processed_subg into distinct graph objects if connections have been severed, i.e., if there are now multiple isolated subgraphs
         new_subgraphs += list(processed_split_subgs)
-        # for new_subg in processed_split_subgs:
-        #     _ps(new_subg)
-        # for new_subg in processed_split_subgs:
-        #     new_subgraphs.append(new_subg)
     return (x for x in new_subgraphs)  # TODO: actually use generator or change typehint

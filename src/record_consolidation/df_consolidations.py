@@ -6,11 +6,10 @@ import polars.selectors as cs
 
 from record_consolidation._typing import SubGraphPostProcessorFnc
 from record_consolidation.graphs import (
+    atomize_records,
     extract_consolidation_mapping_from_subgraphs,
-    extract_normalized_atomic,
     unconsolidated_df_to_subgraphs,
 )
-from record_consolidation.utils.polars_df import remove_string_nulls_and_uppercase
 
 
 def _consolidate_intra_field(
@@ -172,14 +171,14 @@ def _replace_vals_w_canons_via_atomized(
 
 def normalize_subset(
     df: pl.DataFrame,
-    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
+    cols_to_normalize: list[str] | Literal["all"],
+    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None = None,
     pre_processing_fnc_before_clustering: (
         Callable[[pl.DataFrame], pl.DataFrame] | None
-    ) = remove_string_nulls_and_uppercase,
-    cols_to_normalize: list[str] | Literal["all"] = "all",
+    ) = None,
     atomized_subset: pl.DataFrame | None = None,
     non_null_fields: list[str] = [],
-    consolidate_twice: bool = True,
+    consolidate_twice: bool = False,
 ) -> pl.DataFrame:
     # TODO: further QA and improvement of the (mapping canonicals into DF) process
     # 1) Nulls remain where they shouldn't (e.g., null CUSIPs next to canonicalized issuer_names)
@@ -218,9 +217,14 @@ def normalize_subset(
     """
     # TODO: add `atomized_subset` as an optional arg
 
+    if pre_processing_fnc_before_clustering is None:
+        warn("`pre_processing_fnc_before_clustering` is None")
+    if connected_subgraphs_postprocessor is None:
+        warn("`connected_subgraphs_postprocessor` is None")
+
     if cols_to_normalize == "all":
         warn(
-            "`cols_to_normalize` = 'All' is unusally incorrect usage, and can lead to incorrect output. If this function is taking a long time, you probably meant to only normalize a subset."
+            "`cols_to_normalize` = 'all' is unusally incorrect usage, and can lead to incorrect output. If this function is taking a long time, you probably meant to only normalize a subset."
         )
         subset_selector: list[str] = df.columns
     else:
@@ -237,7 +241,7 @@ def normalize_subset(
 
     # TODO: sloppy typing
     if atomized_subset is None:
-        atomized_subset = extract_normalized_atomic(
+        atomized_subset = atomize_records(
             subset,
             connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
             pre_processing_fnc=None,
@@ -258,7 +262,7 @@ def normalize_subset(
         to_return = _replace_vals_w_canons_via_atomized(
             df=to_return,
             subset=subset,
-            atomized_subset=extract_normalized_atomic(
+            atomized_subset=atomize_records(
                 to_return.select(pl.col(subset_selector)),
                 connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
                 pre_processing_fnc=pre_processing_fnc_before_clustering,  # probably redundant because it's already been applied, but probably also doesn't hurt
@@ -266,12 +270,6 @@ def normalize_subset(
             subset_selector=subset_selector,
             non_null_fields=non_null_fields,
         )
-
-    # print(
-    #     "to_return_intermediate:",
-    #     to_return_intermediate.select(pl.col(subset_selector).is_null().sum()),
-    # )
-    # print("to_return:", to_return.select(pl.col(subset_selector).is_null().sum()))
 
     # final qa here just to be sure
     qa_normalized_subset(

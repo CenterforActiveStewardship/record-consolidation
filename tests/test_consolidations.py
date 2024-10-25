@@ -4,10 +4,7 @@ import polars as pl
 import pytest
 from regression_tester import RegressionTestPackage
 
-from record_consolidation.df_consolidations import (
-    extract_normalized_atomic,
-    normalize_subset,
-)
+from record_consolidation.df_consolidations import atomize_records, normalize_subset
 
 
 @pytest.fixture()
@@ -52,7 +49,7 @@ def test_normalization_via_normalized_atomizer(MSFTS) -> None:
     raw_input_path = root_path / "msfts_and_amzns.parquet"
     reg_tester = RegressionTestPackage(
         root_path=root_path,
-        extraction_fnc=lambda x: extract_normalized_atomic(
+        extraction_fnc=lambda x: atomize_records(
             MSFTS,
             connected_subgraphs_postprocessor=None,
             pre_processing_fnc=None,

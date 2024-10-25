@@ -48,11 +48,6 @@ def find_k_clusters(
             raise ValueError(
                 f"{finding_method=} is deprecated; use `n_0val_eigeinvalues` instead."
             )
-            # warn(warning_str)
-            # eigen_gaps = np.diff(eigenvalues)
-            # k = int(
-            #     np.argmax(eigen_gaps) + 1
-            # )  # The index of the largest gap indicates number of clusters
         case "n_0val_eigeinvalues":
             k = (
                 eigenvalues < eigenval_threshold
@@ -91,21 +86,20 @@ def _partition_companies_graph(
             G = partition_via_spectral_clustering(G, k=k, verbose=verbose)
         case "louvain":
             G = partition_via_louvain(G, verbose=verbose, seed=seed)
-        # case "girvan_newman":
-        #     G = _partition_via_girvan_newman(G, verbose=verbose, seed=seed)
         case _:
             raise NotImplementedError(method)
     return G
 
 
-def partition_companies_graph_where_necessary(
+def partition_subgraphs(
     G: nx.Graph,
     k_finding_method: Literal[
         "n_0val_eigeinvalues", "eigen_gaps"
     ] = "n_0val_eigeinvalues",
+    eigenval_threshold: float | None = 0.05,
     sort_articulation_points_by: Literal[
         "degree", "betweenness_centrality"
-    ] = "betweenness_centrality",
+    ] = "betweenness_centrality",  # TODO: weighted consideration of both?
     partitioning_methods: Iterable[PartitioningMethod] = partitioning_methods,
     verbose: bool = False,
     verbose_within_partitioning_algs: bool = False,
@@ -116,6 +110,7 @@ def partition_companies_graph_where_necessary(
     k: int = find_k_clusters(
         G.copy(),
         finding_method=k_finding_method,
+        eigenval_threshold=eigenval_threshold,
         verbose=verbose_within_partitioning_algs,
     )
     if k == 1:
@@ -149,7 +144,6 @@ def partition_companies_graph_where_necessary(
         # ensure that the result produced the correct number of partitions
         if nx.number_connected_components(partition_attempts[method]) != k:
             method_scores[method] = 0
-        # if verbose:
         if verbose:
             print(
                 "-" * 100, method, "score =", round(method_scores[method], 3), "-" * 100

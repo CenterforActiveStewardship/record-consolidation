@@ -210,7 +210,7 @@ def extract_consolidation_mapping_from_subgraphs(
     return overall_consolidations
 
 
-def extract_normalized_atomic(
+def atomize_records(
     df: pl.DataFrame,
     connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
     pre_processing_fnc: Callable[[pl.DataFrame], pl.DataFrame] | None,
