@@ -2,7 +2,7 @@ import networkx as nx
 import polars as pl
 import pytest
 
-from record_consolidation.graphs import unconsolidated_df_to_graph
+from record_consolidation.graphs import _convert_to_graph
 
 
 @pytest.fixture()
@@ -29,8 +29,11 @@ def MOCK_MSFT_DF() -> pl.DataFrame:
     )
 
 
-def test_unconsolidated_df_to_graph(MOCK_MSFT_DF) -> None:
-    g: nx.Graph = unconsolidated_df_to_graph(MOCK_MSFT_DF, weight_edges=False)
+def test__convert_to_graph(MOCK_MSFT_DF) -> None:
+    g: nx.Graph = _convert_to_graph(
+        MOCK_MSFT_DF,
+        weight_edges=False,
+    )
 
     correct_nodes = {
         "MICROSOFT CORPORATION",

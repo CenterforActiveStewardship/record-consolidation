@@ -1,33 +1,19 @@
 from collections import defaultdict
 from itertools import combinations
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 import networkx as nx
 import polars as pl
 
-from .utils import extract_connected_subgraphs
+from record_consolidation._typing import GraphGenerator, SubGraphPostProcessorFnc
+from record_consolidation.subgraph_post_processing.apply_alg_to_subgraphs import (
+    apply_post_processor_to_subgraphs,
+)
+from record_consolidation.utils.graphs import extract_connected_subgraphs
+from record_consolidation.utils.polars_df import remove_string_nulls
 
 
-def unconsolidated_df_to_graph(
-    df: pl.DataFrame, weight_edges: bool = False
-) -> nx.Graph:
-    """
-    Converts an unconsolidated Polars DataFrame into a NetworkX graph.
-
-    This function processes a DataFrame where each row represents an entity with various attributes (e.g., a company with a name, CUSIP, ISIN, etc.).
-    It creates a graph where each unique attribute value becomes a node, and edges are formed between
-    nodes that appear together in the same row. Optionally, edges can be weighted based on the number
-    of times the connected nodes co-occur.
-
-    Args:
-        df (pl.DataFrame): The input DataFrame containing entity attributes.
-        weight_edges (bool): If True, edges will be weighted based on co-occurrence counts. Defaults to False.
-
-    Returns:
-        nx.Graph: A NetworkX graph where nodes represent unique attribute values and edges represent
-                  co-occurrences of these values within the same row of the DataFrame.
-    """
-    df = df.select(pl.all().replace(["", "N/A"], None))
+def _convert_to_graph(df: pl.DataFrame, weight_edges: bool) -> nx.Graph:
     G: nx.Graph = nx.Graph()
     for row in df.rows(named=True):
         row = {k: v for k, v in row.items() if v is not None}
@@ -51,7 +37,59 @@ def unconsolidated_df_to_graph(
                     G.add_edge(value1, value2, count=1, fields={field1, field2})
             else:
                 G.add_edge(value1, value2)
+
+    # confirm that all values made it into the graph
+    for field in df.columns:
+        n_non_null: int = df.select(pl.col(field).is_not_null().sum()).item()
+        graph_total_count_for_field: int = sum(
+            x[1]["count"] for x in G.nodes.data() if x[1]["field"] == field
+        )
+        if graph_total_count_for_field != n_non_null:
+            raise ValueError(graph_total_count_for_field, n_non_null)
+
     return G
+
+
+def unconsolidated_df_to_subgraphs(
+    df: pl.DataFrame,
+    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
+    pre_processing_fnc: (
+        Callable[[pl.DataFrame], pl.DataFrame] | None
+    ) = remove_string_nulls,  # TODO: remove default for dist
+    weight_edges: bool = True,
+    return_as_connected_subgraphs: bool = True,
+) -> GraphGenerator:
+    """
+    Converts an unconsolidated Polars DataFrame into a NetworkX graph.
+
+    This function processes a DataFrame where each row represents an entity with various attributes (e.g., a company with a name, CUSIP, ISIN, etc.).
+    It creates a graph where each unique attribute value becomes a node, and edges are formed between
+    nodes that appear together in the same row. Optionally, edges can be weighted based on the number
+    of times the connected nodes co-occur.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame containing entity attributes.
+        weight_edges (bool): If True, edges will be weighted based on co-occurrence counts. Defaults to False.
+
+    Returns:
+        nx.Graph: A NetworkX graph where nodes represent unique attribute values and edges represent
+                  co-occurrences of these values within the same row of the DataFrame.
+    """
+    if pre_processing_fnc is not None:
+        df = df.pipe(pre_processing_fnc)
+
+    G = _convert_to_graph(df, weight_edges=weight_edges)
+
+    if not return_as_connected_subgraphs:
+        raise NotImplementedError()
+    connected_subgraphs: GraphGenerator = extract_connected_subgraphs(G)
+
+    if connected_subgraphs_postprocessor is not None:
+        connected_subgraphs = apply_post_processor_to_subgraphs(
+            connected_subgraphs, graphs_post_processor=connected_subgraphs_postprocessor
+        )
+
+    return connected_subgraphs
 
 
 def _extract_canonicals_from_subgraph(
@@ -78,7 +116,9 @@ def _extract_canonicals_from_subgraph(
     match method:
         case "max_n":
             for field in fields:
-                respective_nodes = [n for n in g.nodes if g.nodes[n]["field"] == field]
+                respective_nodes = sorted(  # sort for determinism in the case of a tie
+                    [n for n in g.nodes if g.nodes[n]["field"] == field]
+                )
                 max_n_node = max(respective_nodes, key=lambda x: g.nodes[x]["count"])
                 canonicals[field] = max_n_node
         case _:
@@ -138,7 +178,9 @@ def _extract_consolidation_mapping_from_subgraph(
     return mapping
 
 
-def extract_consolidation_mapping_from_graph(g: nx.Graph) -> dict[str, dict[str, Any]]:
+def extract_consolidation_mapping_from_subgraphs(
+    subgraphs: GraphGenerator,
+) -> dict[str, dict[str, Any]]:
     """
     Extracts a consolidation mapping from a graph by processing its connected subgraphs.
 
@@ -154,7 +196,7 @@ def extract_consolidation_mapping_from_graph(g: nx.Graph) -> dict[str, dict[str,
                                    dictionary maps each node to a canonical value corresponding to that field.
     """
     overall_consolidations: dict[str, dict[str, Any]] = defaultdict(dict)
-    for subg in extract_connected_subgraphs(g):
+    for subg in subgraphs:
         consolidation_mapping = _extract_consolidation_mapping_from_subgraph(subg)
         # e.g.,
         # {'cusip': {'594918104': '594918104', '594918105': '594918104'},
@@ -166,3 +208,32 @@ def extract_consolidation_mapping_from_graph(g: nx.Graph) -> dict[str, dict[str,
             # e.g. ("cusip", {'594918104': '594918104', '594918105': '594918104'})
             overall_consolidations[field].update(field_mapping)
     return overall_consolidations
+
+
+def atomize_records(
+    df: pl.DataFrame,
+    connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None,
+    pre_processing_fnc: Callable[[pl.DataFrame], pl.DataFrame] | None,
+) -> pl.DataFrame:
+    """
+    Extracts a normalized atomic DataFrame from the input DataFrame.
+
+    This function converts the input DataFrame into a graph, processes its connected subgraphs to extract
+    canonical values for each field, and then constructs a new DataFrame from these canonical values.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame containing entity attributes.
+
+    Returns:
+        pl.DataFrame: A new DataFrame where each row represents a set of canonical values for the fields
+                      present in the input DataFrame.
+    """
+    df_precursor: list[dict[str, Any]] = []
+    connected_subgs: GraphGenerator = unconsolidated_df_to_subgraphs(
+        df,
+        pre_processing_fnc=pre_processing_fnc,
+        connected_subgraphs_postprocessor=connected_subgraphs_postprocessor,
+    )
+    for subg in connected_subgs:
+        df_precursor.append(_extract_canonicals_from_subgraph(subg, "max_n"))
+    return pl.DataFrame(df_precursor).sort(pl.all())

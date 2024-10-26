@@ -9,7 +9,76 @@
 #   generate-hashes: false
 
 -e file:.
+annotated-types==0.7.0
+    # via pydantic
+contourpy==1.3.0
+    # via matplotlib
+cycler==0.12.1
+    # via matplotlib
+fonttools==4.54.1
+    # via matplotlib
+iniconfig==2.0.0
+    # via pytest
+joblib==1.4.2
+    # via scikit-learn
+kiwisolver==1.4.7
+    # via matplotlib
+matplotlib==3.9.2
+    # via record-consolidation
 networkx==3.3
     # via record-consolidation
+numpy==1.26.4
+    # via contourpy
+    # via matplotlib
+    # via pandas
+    # via pyarrow
+    # via scikit-learn
+    # via scipy
+packaging==24.1
+    # via matplotlib
+    # via pytest
+pandas==2.2.2
+    # via regression-tester
+pillow==11.0.0
+    # via matplotlib
+pluggy==1.5.0
+    # via pytest
 polars==1.7.1
     # via record-consolidation
+    # via regression-tester
+pyarrow==17.0.0
+    # via regression-tester
+pydantic==2.9.2
+    # via regression-tester
+pydantic-core==2.23.4
+    # via pydantic
+pyparsing==3.2.0
+    # via matplotlib
+pytest==8.3.3
+    # via pytest-mock
+pytest-mock==3.14.0
+    # via regression-tester
+python-dateutil==2.9.0.post0
+    # via matplotlib
+    # via pandas
+pytz==2024.2
+    # via pandas
+rapidfuzz==3.10.0
+    # via record-consolidation
+regression-tester @ git+https://github.com/m-gaster/regression-tester@97e54fa16bccba5dfe956c3244003ec962292424
+    # via record-consolidation
+scikit-learn==1.5.2
+    # via record-consolidation
+scipy==1.14.1
+    # via scikit-learn
+six==1.16.0
+    # via python-dateutil
+threadpoolctl==3.5.0
+    # via scikit-learn
+tqdm==4.66.5
+    # via record-consolidation
+typing-extensions==4.12.2
+    # via pydantic
+    # via pydantic-core
+tzdata==2024.1
+    # via pandas

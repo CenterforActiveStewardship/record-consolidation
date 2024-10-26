@@ -22,8 +22,8 @@ repos:
         entry: isort --check .
         language: system
         pass_filenames: false
-      # - id: pytest  # UNCOMMENT ONCE TESTS ARE DEVELOPED
-      #   name: pytest
-      #   entry: pytest -s
-      #   language: system
-      #   pass_filenames: false
+      - id: pytest  # UNCOMMENT ONCE TESTS ARE DEVELOPED
+        name: pytest
+        entry: pytest -s
+        language: system
+        pass_filenames: false
