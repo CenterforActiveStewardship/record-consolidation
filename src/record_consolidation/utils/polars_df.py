@@ -40,6 +40,7 @@ def assign_id(df: pl.DataFrame, name: str, constituent_cols: list[str]) -> pl.Da
         .with_row_index(name="_index")
         .sort(constituent_cols)
         .with_columns(pl.struct(constituent_cols).rle_id().alias(name))
+        .sort("_index")
         .collect()
         .select(pl.col([name] + df.columns))  # reorder
     )
