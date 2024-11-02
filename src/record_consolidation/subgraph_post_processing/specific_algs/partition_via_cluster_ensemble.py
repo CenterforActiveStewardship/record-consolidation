@@ -7,7 +7,7 @@ from scipy.sparse import csgraph
 
 from record_consolidation.utils.draw_graph import draw_graph, plot_eigenvalues
 
-from .partitioning_algs import (
+from .specific_partitioning_algs import (
     PartitioningMethod,
     partition_via_articulation_points,
     partition_via_betweenness_centrality,
@@ -62,7 +62,7 @@ def find_k_clusters(
     return k
 
 
-def _partition_companies_graph(
+def _partition_ensemble_router(
     G: nx.Graph,
     k: int,
     method: PartitioningMethod,
@@ -128,7 +128,7 @@ def partition_subgraphs(
                 "-" * 100,
             )
 
-        partition_attempts[method] = _partition_companies_graph(
+        partition_attempts[method] = _partition_ensemble_router(
             G.copy(),
             k=k,
             method=method,
