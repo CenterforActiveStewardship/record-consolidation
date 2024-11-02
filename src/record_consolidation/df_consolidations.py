@@ -10,6 +10,7 @@ from record_consolidation.graphs import (
     extract_consolidation_mapping_from_subgraphs,
     unconsolidated_df_to_subgraphs,
 )
+from record_consolidation.utils.polars_df import assign_id
 
 
 def _consolidate_intra_field(
@@ -172,35 +173,38 @@ def _replace_vals_w_canons_via_atomized(
 def normalize_subset(
     df: pl.DataFrame,
     cols_to_normalize: list[str] | Literal["all"],
+    id_colname: str | None,
     connected_subgraphs_postprocessor: SubGraphPostProcessorFnc | None = None,
     pre_processing_fnc_before_clustering: (
         Callable[[pl.DataFrame], pl.DataFrame] | None
     ) = None,
     atomized_subset: pl.DataFrame | None = None,
     non_null_fields: list[str] = [],
-    consolidate_twice: bool = False,
+    consolidate_twice: bool = False,  # NOTE: this is not performing well as of Nov 1, 2024
 ) -> pl.DataFrame:
     # TODO: further QA and improvement of the (mapping canonicals into DF) process
     # 1) Nulls remain where they shouldn't (e.g., null CUSIPs next to canonicalized issuer_names)
     # 2) Possible spurious consolidation with `consolidate_twice`
     """
-     Normalizes a subset of columns in the DataFrame using atomic joins and post-processing functions.
+    Normalizes a subset of columns in the DataFrame using atomic joins and post-processing functions.
 
-     This function takes a DataFrame and a list of columns to normalize. It performs pre-processing on the specified subset of columns,
-     extracts an atomized subset of canonical values (via `extract_normalized_atomic`), and joins them back into the DataFrame to replace the original values with their normalized counterparts.
-     If "all" is specified, all columns in the DataFrame are normalized -- this is *not* recommended.
+    This function takes a DataFrame and a list of columns to normalize. It performs pre-processing on the specified subset of columns,
+    extracts an atomized subset of canonical values (via `extract_normalized_atomic`), and joins them back into the DataFrame to replace the original values with their normalized counterparts.
+    If "all" is specified, all columns in the DataFrame are normalized -- this is *not* recommended.
 
     The normalization process involves:
     1. Pre-processing the subset of columns (if a function is provided).
     2. Consolidating values within each field to their canonical forms.
     3. Extracting canonical values from a graph-based "atomized_subset" or using a pre-provided "atomized_subset".
     4. Mapping (joining) the "atomized_subset" into the final result by over-joining and then coalescing the non-null values.
-    4.5. Repeating (4), but using the output of (4) as input.
-        - This takes care of straggler nulls, although a better fix should be applied.
+    4.5. ~~Repeating (4), but using the output of (4) as input.~~
+        - ~~This takes care of straggler nulls, although a better fix should be applied.~~
     5. Ensuring no new null values are introduced and maintaining non-null constraints in specified columns.
 
     Args:
         df (pl.DataFrame): The input DataFrame containing the data to be normalized.
+        cols_to_normalize (list[str] | Literal["all"]): The columns to normalize. If "all", all columns in the DataFrame are normalized.
+        id_colname (str | None): Name of the column to assign unique IDs to, if specified.
         connected_subgraphs_postprocessor (SubGraphPostProcessorFnc | None): A function to process subgraphs during the normalization process.
         pre_processing_fnc_before_clustering (Callable[[pl.DataFrame], pl.DataFrame] | None): Function applied to preprocess the subset of columns to normalize, defaulting to `remove_string_nulls_and_uppercase`.
         cols_to_normalize (list[str] | Literal["all"]): The columns to normalize. If "all", all columns in the DataFrame are normalized.
@@ -214,6 +218,8 @@ def normalize_subset(
         ValueError: If the shape of the returned DataFrame does not match the original DataFrame.
         ValueError: If the function introduces new null values into the non-nullable fields.
         Warning: If null values are detected in non-nullable fields without raising an exception.
+    Notes:
+        - For best performance, limit `cols_to_normalize` to a targeted subset rather than "all."
     """
     # TODO: add `atomized_subset` as an optional arg
 
@@ -259,6 +265,7 @@ def normalize_subset(
     # e.g., "MICROSOFT CORPORATION" w/ null CUSIP
     # TODO: this is hacky, and I'm not certain that running `_replace_vals_w_canons_via_atomized` twice is guaranteed to fix things. plus, this reflects a lack of control over the process
     if consolidate_twice:
+        raise NotImplementedError("Not supported due to false-positive linkings.")
         to_return = _replace_vals_w_canons_via_atomized(
             df=to_return,
             subset=subset,
@@ -279,5 +286,10 @@ def normalize_subset(
         normed_cols=subset_selector,
         non_null_fields=non_null_fields,
     )
+
+    if id_colname is not None:
+        to_return = to_return.pipe(
+            assign_id, name=id_colname, constituent_cols=subset_selector
+        )
 
     return to_return

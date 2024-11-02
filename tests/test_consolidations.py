@@ -70,7 +70,10 @@ def test_normalization_via_subset_normalizer(MSFTS) -> None:
     reg_tester = RegressionTestPackage(
         root_path=root_path,
         extraction_fnc=lambda x: normalize_subset(
-            MSFTS, connected_subgraphs_postprocessor=None, cols_to_normalize="all"
+            MSFTS,
+            connected_subgraphs_postprocessor=None,
+            cols_to_normalize="all",
+            id_colname=None,
         )
         .unique()
         .sort(pl.all()),

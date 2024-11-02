@@ -31,3 +31,15 @@ def assign_columns_if_missing(
 
 def extract_null_counts(df: pl.DataFrame) -> dict[str, int]:
     return df.select(pl.all().is_null().sum()).to_dicts()[0]
+
+
+def assign_id(df: pl.DataFrame, name: str, constituent_cols: list[str]) -> pl.DataFrame:
+    print(name)
+    return (
+        df.lazy()
+        .with_row_index(name="_index")
+        .sort(constituent_cols)
+        .with_columns(pl.struct(constituent_cols).rle_id().alias(name))
+        .collect()
+        .select(pl.col([name] + df.columns))  # reorder
+    )
