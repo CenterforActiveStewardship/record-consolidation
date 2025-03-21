@@ -1,25 +1,3 @@
-<!-- # record-consolidation -->
-<!-- 
-## Overview
-
-`record-consolidation` is designed to consolidate/unify data records across linkages.
-Given a polars DataFrame of disagreeing records, `record-consolidation` exploits their natural linkage structures to normalize & consolidate the data.
-
-Under the hood, `record-consolidation` converts input dataframes into a `networkx` graph, extracts the strongly connected components as groups, determines a "canonical" identity for each group, and and assigns this canonical identity back into the original dataframe
-
-`record-consolidation` provides options for augmentating this process. Most notably, users can provide their own function for processing graphs before "canonical" identities are assigned to each group. For example, a specific partitioning algorithm (such as the included `partition_subgraphs()`) can be passed - this is especially useful if entities are sometimes spuriously recorded with the identifiers from another group, leading to weakly linked clusters that should be partitioned.
-
-## Examples
-
-<!-- ![alt text](image.png) -->
-<!-- <img src="image.png" alt="drawing" width="200"/> -->
-
-<!-- <div style="text-align: center;">
-    <img src="image.png" alt="drawing" width="200"/>
-    <a href="https://www.vecteezy.com/free-vector/disc" style="font-size: 8px;">
-  Disc Vectors by Vecteezy
-</a> -->
-
 <div align="center">
   <img src="image.png" alt="drawing" style="width: 120px;">
 </div>
@@ -28,9 +6,8 @@ Under the hood, `record-consolidation` converts input dataframes into a `network
 
 `record-consolidation` is a Python package for consolidating data records with erratic linkages, powered by a graph-based backend and customizable processing options.
 
-- Natural linkage-based consolidation
-- Flexible graph partitioning
-- Built with `polars` and `networkx` for speed
+## Disclaimer
+This library is under development and is primarily intended for internal use. No guarantees about stability or maintenance for other uses. Licensing GNU AGPLv3, feedback welcome.
 
 ## Overview
 
@@ -41,16 +18,16 @@ Options for customization are available, allowing users to inject specific proce
 ## Installation
 ```sh
 # rye # TODO: test
-rye add record-consolidation --git https://github.com/m-gaster/record-consolidation/
+rye add record-consolidation --git https://github.com/CenterforActiveStewardship/record-consolidation/
 
 # uv # TODO: test
-uv add record-consolidation git+https://github.com/m-gaster/record-consolidation/
+uv add record-consolidation git+https://github.com/CenterforActiveStewardship/record-consolidation/
 
 # pip # TODO: test
-pip install git+https://github.com/m-gaster/record-consolidation.git
+pip install git+https://github.com/CenterforActiveStewardship/record-consolidation.git
 
 # poetry # TODO: test
-poetry add record-consolidation --git https://github.com/m-gaster/record-consolidation.git
+poetry add record-consolidation --git https://github.com/CenterforActiveStewardship/record-consolidation.git
 ```
 
 ## Examples
