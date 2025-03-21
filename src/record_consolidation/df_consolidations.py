@@ -116,7 +116,7 @@ def qa_normalized_subset(
 def _replace_vals_w_canons_via_atomized(
     df: pl.DataFrame,
     subset: pl.DataFrame,
-    atomized_subset: pl.DataFrame,
+    atomized_subset: pl.DataFrame,  # confirmed functioning as expected for microsoft case
     subset_selector: list[str],
     non_null_fields: list[str],
 ) -> pl.DataFrame:
@@ -132,7 +132,7 @@ def _replace_vals_w_canons_via_atomized(
         )
 
     # THIS REARRAGENMENT IS IMPORTANT + INTENTIONAL:
-    #   if we don't do this, the original (non-canonicalized) values are left-most and thus end up in the normalized outpu
+    #   if we don't do this, the original (non-canonicalized) values are left-most and thus end up in the normalized output
     #   because coalescing happens from left to right.
     to_return_precursor = pl.concat(
         [
@@ -207,7 +207,6 @@ def normalize_subset(
         id_colname (str | None): Name of the column to assign unique IDs to, if specified.
         connected_subgraphs_postprocessor (SubGraphPostProcessorFnc | None): A function to process subgraphs during the normalization process.
         pre_processing_fnc_before_clustering (Callable[[pl.DataFrame], pl.DataFrame] | None): Function applied to preprocess the subset of columns to normalize, defaulting to `remove_string_nulls_and_uppercase`.
-        cols_to_normalize (list[str] | Literal["all"]): The columns to normalize. If "all", all columns in the DataFrame are normalized.
         atomized_subset (pl.LazyFrame | pl.DataFrame | None): Optionally passed precomputed canonical values; if None, the function will compute them.
         non_null_fields (list[str]): Fields that are expected to be non-null. Raises warnings if null values are detected in these fields after processing.
 
@@ -278,7 +277,7 @@ def normalize_subset(
             non_null_fields=non_null_fields,
         )
 
-    # final qa here just to be sure
+    # final qa here just to be sure - it's cheap
     qa_normalized_subset(
         og=df,
         normed=to_return,
