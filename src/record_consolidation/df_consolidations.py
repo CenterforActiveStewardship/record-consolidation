@@ -292,3 +292,57 @@ def normalize_subset(
         )
 
     return to_return
+
+
+def consolidate_most_common_over_col_shallow(
+    input: pl.DataFrame,
+    group_over_colname: str,
+    value_colname: str,
+    suffix: str = "_original",
+):
+    """
+    For each group in a DataFrame, compute and attach the most frequent value of a specified column.
+
+    This function:
+      1. Groups `input` by `group_over_colname`.
+      2. Computes the mode (most common value) of `value_colname` within each group.
+      3. Renames the original `value_colname` in `input` to `{value_colname}_original`.
+      4. Joins the modes back onto the renamed DataFrame as a new column `{value_colname}`.
+
+    Args:
+        input (pl.DataFrame): The DataFrame to process.
+        group_over_colname (str): Name of the column to group by.
+        value_colname (str): Name of the column to find the most common value for.
+
+    Returns:
+        pl.DataFrame: A new DataFrame where:
+            - The original `value_colname` has been renamed to `{value_colname}_original`.
+            - A new column `{value_colname}` contains the most common value per group.
+
+    Example:
+        >>> df = pl.DataFrame({
+        ...     "proposal_id": [1, 1, 1, 2, 2, 3],
+        ...     "vote_categories": ["For", "Against", "For", "For", "For", "Abstain"],
+        ... })
+        >>> result = consolidate_most_common_over_col(
+        ...     input=df,
+        ...     group_over_colname="proposal_id",
+        ...     value_colname="vote_categories",
+        ... )
+        >>> result.to_dict()
+        {
+            "proposal_id":     [1,       1,         1,       2,     2,        3],
+            "vote_categories_original": ["For", "Against", "For", "For", "For", "Abstain"],
+            "vote_categories":           ["For", "For",     "For", "For", "For", "Abstain"],
+        }
+    """
+    modes = input.group_by(group_over_colname).agg(pl.col(value_colname).mode().first())
+    return input.rename(
+        {
+            value_colname: value_colname + suffix,
+        }
+    ).join(
+        modes,
+        how="left",
+        on=group_over_colname,
+    )
